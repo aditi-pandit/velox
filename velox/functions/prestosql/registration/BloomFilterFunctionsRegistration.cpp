@@ -19,8 +19,33 @@
 namespace facebook::velox::functions {
 
 void registerBloomFilterFunctions(const std::string& prefix) {
+  const std::vector<std::string> names = {
+      prefix + "bloom_filter_might_contain"};
+
+  // Numeric types: hash the raw storage bytes of the value.
+  registerFunction<BloomFilterMightContainFunction, bool, Varbinary, bool>(
+      names);
+  registerFunction<BloomFilterMightContainFunction, bool, Varbinary, int8_t>(
+      names);
+  registerFunction<BloomFilterMightContainFunction, bool, Varbinary, int16_t>(
+      names);
+  registerFunction<BloomFilterMightContainFunction, bool, Varbinary, int32_t>(
+      names);
   registerFunction<BloomFilterMightContainFunction, bool, Varbinary, int64_t>(
-      {prefix + "bloom_filter_might_contain"});
+      names);
+  registerFunction<BloomFilterMightContainFunction, bool, Varbinary, float>(
+      names);
+  registerFunction<BloomFilterMightContainFunction, bool, Varbinary, double>(
+      names);
+
+  // String types: hash the content bytes.
+  registerFunction<BloomFilterMightContainFunction, bool, Varbinary, Varchar>(
+      names);
+  registerFunction<
+      BloomFilterMightContainFunction,
+      bool,
+      Varbinary,
+      Varbinary>(names);
 }
 
 } // namespace facebook::velox::functions
