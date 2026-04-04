@@ -42,6 +42,7 @@ extern void registerJsonFunctions(const std::string& prefix);
 extern void registerMapFunctions(const std::string& prefix);
 extern void registerStringFunctions(const std::string& prefix);
 extern void registerBinaryFunctions(const std::string& prefix);
+extern void registerBloomFilterFunctions(const std::string& prefix);
 extern void registerURLFunctions(const std::string& prefix);
 extern void registerDataSizeFunctions(const std::string& prefix);
 extern void registerMapAllowingDuplicates(
@@ -143,6 +144,10 @@ void registerBinaryFunctions(const std::string& prefix) {
   functions::registerBinaryFunctions(prefix);
 }
 
+void registerBloomFilterFunctions(const std::string& prefix) {
+  functions::registerBloomFilterFunctions(prefix);
+}
+
 void registerBitwiseFunctions(const std::string& prefix) {
   functions::registerBitwiseFunctions(prefix);
 }
@@ -174,6 +179,7 @@ void registerAllScalarFunctions(const std::string& prefix) {
   registerURLFunctions(prefix);
   registerStringFunctions(prefix);
   registerBinaryFunctions(prefix);
+  registerBloomFilterFunctions(prefix);
   registerBitwiseFunctions(prefix);
   registerUuidFunctions(prefix);
   registerIPAddressFunctions(prefix);

@@ -73,6 +73,7 @@ velox_add_library(
   BinaryFunctions.h
   BingTileFunctions.h
   Bitwise.h
+  BloomFilterFunctions.h
   Cardinality.h
   Comparisons.h
   DataSizeFunctions.h

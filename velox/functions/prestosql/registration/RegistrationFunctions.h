@@ -55,6 +55,8 @@ void registerStringFunctions(const std::string& prefix = "");
 
 void registerBinaryFunctions(const std::string& prefix = "");
 
+void registerBloomFilterFunctions(const std::string& prefix = "");
+
 void registerBitwiseFunctions(const std::string& prefix = "");
 
 void registerAllScalarFunctions(const std::string& prefix = "");

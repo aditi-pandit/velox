@@ -16,6 +16,7 @@ velox_add_library(
   velox_functions_prestosql
   ArrayConcatRegistration.cpp
   ArrayFunctionsRegistration.cpp
+  BloomFilterFunctionsRegistration.cpp
   ArrayNGramsRegistration.cpp
   ArraySplitIntoChunksRegistration.cpp
   BinaryFunctionsRegistration.cpp
@@ -74,6 +75,7 @@ velox_link_libraries(
   velox_functions_prestosql_impl
   velox_is_null_functions
   velox_functions_sfm
+  velox_common_base
   simdjson::simdjson
 )
 
