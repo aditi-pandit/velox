@@ -15,6 +15,7 @@
 velox_add_library(
   velox_aggregates
   ApproxDistinctAggregate.cpp
+  BloomFilterAggregateFunction.cpp
   ApproxMostFrequentAggregate.cpp
   ApproxPercentileAggregate.cpp
   ArbitraryAggregate.cpp
@@ -63,6 +64,7 @@ velox_add_library(
   VectorSumAggregate.cpp
   HEADERS
   ApproxDistinctAggregates.h
+  BloomFilterAggregateFunction.h
   ApproxMostFrequentAggregate.h
   ApproxPercentileAggregate.h
   ArbitraryAggregate.h
@@ -119,6 +121,7 @@ velox_add_library(
 
 velox_link_libraries(
   velox_aggregates
+  velox_common_base
   velox_common_hyperloglog
   velox_exec
   velox_expression

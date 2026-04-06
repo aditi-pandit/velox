@@ -72,6 +72,10 @@ extern void registerApproxMostFrequentAggregate(
     const std::vector<std::string>& names,
     bool withCompanionFunctions,
     bool overwrite);
+extern void registerBloomFilterAggregateFunction(
+    const std::vector<std::string>& names,
+    bool withCompanionFunctions,
+    bool overwrite);
 extern void registerApproxPercentileAggregate(
     const std::vector<std::string>& names,
     bool withCompanionFunctions,
@@ -339,6 +343,8 @@ void registerAllAggregateFunctions(
       overwrite);
   registerArrayAggAggregate(
       {prefix + kArrayAgg}, withCompanionFunctions, overwrite);
+  registerBloomFilterAggregateFunction(
+      {prefix + "bloom_filter_agg"}, withCompanionFunctions, overwrite);
   registerVectorSumAggregate(
       {prefix + kVectorSum}, withCompanionFunctions, overwrite);
   registerAverageAggregate({prefix + kAvg}, withCompanionFunctions, overwrite);
