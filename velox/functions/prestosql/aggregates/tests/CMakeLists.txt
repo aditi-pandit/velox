@@ -17,6 +17,7 @@ set(
   VELOX_AGGREGATES_TEST_SOURCES
   AggregationFunctionRegTest.cpp
   ApproxDistinctTest.cpp
+  BloomFilterAggregateFunctionTest.cpp
   ApproxMostFrequentTest.cpp
   ApproxPercentileTest.cpp
   ArbitraryTest.cpp

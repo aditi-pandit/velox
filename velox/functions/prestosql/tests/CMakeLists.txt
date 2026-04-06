@@ -59,6 +59,7 @@ add_executable(
   BinaryFunctionsTest.cpp
   BingTileCastTest.cpp
   BingTileFunctionsTest.cpp
+  BloomFilterFunctionsTest.cpp
   BitwiseTest.cpp
   CardinalityTest.cpp
   CeilFloorTest.cpp
