@@ -15,6 +15,7 @@ Presto Functions
     functions/presto/map
     functions/presto/regexp
     functions/presto/binary
+    functions/presto/bloomfilter
     functions/presto/json
     functions/presto/conversion
     functions/presto/url
@@ -83,6 +84,7 @@ for :doc:`all <functions/presto/coverage>` and :doc:`most used
     :func:`any_keys_match`                             :func:`hmac_sha1`                                  :func:`simplify_geometry`                              :func:`bitwise_and_agg`                                :func:`percent_rank`
     :func:`any_match`                                  :func:`hmac_sha256`                                :func:`sin`                                            :func:`bitwise_or_agg`                                 :func:`rank`
     :func:`any_values_match`                           :func:`hmac_sha512`                                :func:`slice`                                          :func:`bitwise_xor_agg`                                :func:`row_number`
+                                                                                                                                                                 :func:`bloom_filter_agg`                         
     :func:`array_average`                              :func:`hour`                                       :func:`split`                                          :func:`bool_and`
     :func:`array_constructor`                          in                                                 :func:`split_part`                                     :func:`bool_or`
     :func:`array_cum_sum`                              :func:`infinity`                                   :func:`split_to_map`                                   :func:`checksum`
@@ -136,6 +138,7 @@ for :doc:`all <functions/presto/coverage>` and :doc:`most used
     :func:`bitwise_right_shift_arithmetic`             :func:`lt`                                         :func:`st_points`                                      :func:`stddev`
     :func:`bitwise_shift_left`                         :func:`lte`                                        :func:`st_polygon`                                     :func:`stddev_pop`
     :func:`bitwise_xor`                                :func:`ltrim`                                      :func:`st_relate`                                      :func:`stddev_samp`
+    :func:`bloom_filter_might_contain`                                                                                                                                                                            
     :func:`cardinality`                                :func:`map`                                        :func:`st_startpoint`                                  :func:`sum`
     :func:`cauchy_cdf`                                 :func:`map_concat`                                 :func:`st_symdifference`                               :func:`sum_data_size_for_stats`
     :func:`cbrt`                                       :func:`map_entries`                                :func:`st_touches`                                     :func:`tdigest_agg`
