@@ -33,8 +33,7 @@ namespace facebook::velox::functions {
 /// are hashed as their content bytes.
 ///
 /// Returns false when the value is definitely absent, and true when it might
-/// be present. Returns false conservatively when the bloom filter is not a
-/// constant expression at plan time.
+/// be present.
 ///
 /// Registered for all scalar types: boolean, tinyint, smallint, integer,
 /// bigint, real, double, varchar, and varbinary.
@@ -59,11 +58,11 @@ struct BloomFilterMightContainFunction {
   template <typename TValue>
   FOLLY_ALWAYS_INLINE void call(
       bool& result,
-      const arg_type<Varbinary>& /*bloomFilter*/,
+      const arg_type<Varbinary>& bloomFilter,
       const TValue& value) {
     if (!initialized_) {
-      result = false;
-      return;
+      // Filter was not a constant at plan time; initialize from the row value.
+      initBloomFilter(bloomFilter.data(), bloomFilter.size());
     }
     const uint64_t hash = computeHash(value);
     SplitBlockBloomFilter filter(
