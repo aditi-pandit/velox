@@ -252,6 +252,82 @@ TEST_F(BloomFilterAggregateFunctionTest, allNullInputReturnsNull) {
 }
 
 // ---------------------------------------------------------------------------
+// Partial → final aggregation: the merge step ORs intermediate filters,
+// so the final result must contain every value inserted in any partial.
+// ---------------------------------------------------------------------------
+
+TEST_F(BloomFilterAggregateFunctionTest, partialFinal) {
+  auto values = makeFlatVector<int64_t>({1LL, 2LL, 3LL, 4LL, 5LL});
+  auto input = makeRowVector({values});
+
+  auto plan = PlanBuilder()
+                  .values({input})
+                  .partialAggregation({}, {"bloom_filter_agg(c0)"})
+                  .finalAggregation()
+                  .planNode();
+  auto result = AssertQueryBuilder(plan).copyResults(pool());
+
+  ASSERT_EQ(result->size(), 1);
+  auto* flat = result->childAt(0)->asFlatVector<StringView>();
+  ASSERT_FALSE(flat->isNullAt(0));
+  auto raw = flat->valueAt(0);
+
+  for (int64_t v : {1LL, 2LL, 3LL, 4LL, 5LL}) {
+    EXPECT_TRUE(bloomContains(raw, hashValue(v))) << "missing value " << v;
+  }
+  EXPECT_FALSE(bloomContains(raw, hashValue(int64_t{999})));
+}
+
+// Partial → final with group-by: each group's filter must contain exactly
+// the values assigned to that group, across all partial batches.
+TEST_F(BloomFilterAggregateFunctionTest, partialFinalGroupBy) {
+  // Two batches so the partial step produces two partial states per group.
+  auto keys1 = makeFlatVector<int64_t>({0LL, 1LL});
+  auto vals1 = makeFlatVector<int64_t>({10LL, 20LL});
+  auto keys2 = makeFlatVector<int64_t>({0LL, 1LL});
+  auto vals2 = makeFlatVector<int64_t>({11LL, 21LL});
+
+  auto plan = PlanBuilder()
+                  .values({makeRowVector({keys1, vals1}),
+                           makeRowVector({keys2, vals2})})
+                  .partialAggregation({"c0"}, {"bloom_filter_agg(c1)"})
+                  .finalAggregation()
+                  .planNode();
+  auto result = AssertQueryBuilder(plan).copyResults(pool());
+
+  ASSERT_EQ(result->size(), 2);
+  auto* groupCol = result->childAt(0)->asFlatVector<int64_t>();
+  auto* filterCol = result->childAt(1)->asFlatVector<StringView>();
+
+  int group0Row = -1;
+  int group1Row = -1;
+  for (int i = 0; i < 2; ++i) {
+    if (groupCol->valueAt(i) == 0) {
+      group0Row = i;
+    } else {
+      group1Row = i;
+    }
+  }
+  ASSERT_NE(group0Row, -1);
+  ASSERT_NE(group1Row, -1);
+
+  auto raw0 = filterCol->valueAt(group0Row);
+  auto raw1 = filterCol->valueAt(group1Row);
+
+  // Group 0 accumulated 10 and 11 across the two batches.
+  EXPECT_TRUE(bloomContains(raw0, hashValue(int64_t{10})));
+  EXPECT_TRUE(bloomContains(raw0, hashValue(int64_t{11})));
+  EXPECT_FALSE(bloomContains(raw0, hashValue(int64_t{20})));
+  EXPECT_FALSE(bloomContains(raw0, hashValue(int64_t{21})));
+
+  // Group 1 accumulated 20 and 21 across the two batches.
+  EXPECT_TRUE(bloomContains(raw1, hashValue(int64_t{20})));
+  EXPECT_TRUE(bloomContains(raw1, hashValue(int64_t{21})));
+  EXPECT_FALSE(bloomContains(raw1, hashValue(int64_t{10})));
+  EXPECT_FALSE(bloomContains(raw1, hashValue(int64_t{11})));
+}
+
+// ---------------------------------------------------------------------------
 // Group-by: each group gets its own independent filter.
 // ---------------------------------------------------------------------------
 

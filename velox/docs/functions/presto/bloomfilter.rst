@@ -52,9 +52,9 @@ Functions
     probability. Null values are ignored. If all input values are null the
     result is null.
 
-    This function is a *final-only* aggregate: it cannot be used as an
-    intermediate (partial) aggregate and does not support merging partial
-    states.
+    Supports partial aggregation. Intermediate states are serialized as
+    varbinary and merged in the final step by ORing corresponding blocks,
+    which is valid because all partial filters share the same block count.
 
     Example — build a filter over an integer column::
 

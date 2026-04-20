@@ -114,11 +114,16 @@ FOLLY_ALWAYS_INLINE uint64_t bloomFilterHash(T value) noexcept {
 /// Aggregate that inserts all non-null input values into a Split-Block Bloom
 /// Filter and returns the filter's raw block bytes as varbinary.
 ///
-/// This is a single-phase (final-only) aggregate.  Partial aggregation is not
-/// supported; calling addIntermediateResults() throws VELOX_UNSUPPORTED.
+/// Supports both single-phase and partial-final aggregation. In the partial
+/// phase each group emits its filter as varbinary. In the final (merge) phase
+/// incoming varbinary filters are combined with the accumulator by ORing
+/// corresponding blocks, which is valid because both filters have the same
+/// number of blocks and OR preserves the bloom filter invariant.
 ///
 /// Template parameter T is the C++ native type of the input column
-/// (e.g. int64_t for BIGINT, StringView for VARCHAR/VARBINARY).
+/// (e.g. int64_t for BIGINT, StringView for VARCHAR/VARBINARY).  It is only
+/// used by addRawInput / addSingleGroupRawInput; the intermediate merge
+/// methods work on raw varbinary bytes regardless of T.
 template <typename T>
 class BloomFilterAggregate final : public exec::Aggregate {
  public:
@@ -161,8 +166,8 @@ class BloomFilterAggregate final : public exec::Aggregate {
     }
   }
 
-  /// No partial aggregation; the intermediate and final representations are
-  /// identical.
+  /// The intermediate representation is identical to the final result: the raw
+  /// block bytes.  Partial accumulators are extracted the same way as finals.
   void extractAccumulators(char** groups, int32_t numGroups, VectorPtr* result)
       override {
     extractValues(groups, numGroups, result);
@@ -206,24 +211,37 @@ class BloomFilterAggregate final : public exec::Aggregate {
     });
   }
 
+  /// Merges serialized intermediate bloom filters into their per-group
+  /// accumulators by ORing corresponding blocks.
   void addIntermediateResults(
-      char** /*groups*/,
-      const SelectivityVector& /*rows*/,
-      const std::vector<VectorPtr>& /*args*/,
+      char** groups,
+      const SelectivityVector& rows,
+      const std::vector<VectorPtr>& args,
       bool /*mayPushDown*/) override {
-    VELOX_UNSUPPORTED(
-        "bloom_filter_agg is a final-only aggregate and does not support "
-        "partial aggregation");
+    decodedInput_.decode(*args[0], rows);
+    rows.applyToSelected([&](vector_size_t row) {
+      if (decodedInput_.isNullAt(row)) {
+        return;
+      }
+      mergeFilter(
+          groups[row], decodedInput_.valueAt<StringView>(row));
+    });
   }
 
+  /// Merges serialized intermediate bloom filters into a single group's
+  /// accumulator by ORing corresponding blocks.
   void addSingleGroupIntermediateResults(
-      char* /*group*/,
-      const SelectivityVector& /*rows*/,
-      const std::vector<VectorPtr>& /*args*/,
+      char* group,
+      const SelectivityVector& rows,
+      const std::vector<VectorPtr>& args,
       bool /*mayPushDown*/) override {
-    VELOX_UNSUPPORTED(
-        "bloom_filter_agg is a final-only aggregate and does not support "
-        "partial aggregation");
+    decodedInput_.decode(*args[0], rows);
+    rows.applyToSelected([&](vector_size_t row) {
+      if (decodedInput_.isNullAt(row)) {
+        return;
+      }
+      mergeFilter(group, decodedInput_.valueAt<StringView>(row));
+    });
   }
 
  protected:
@@ -241,9 +259,51 @@ class BloomFilterAggregate final : public exec::Aggregate {
   }
 
  private:
+  /// ORs the bytes of an incoming serialized bloom filter into the
+  /// accumulator.  On the first call for an uninitialized group the incoming
+  /// bytes are copied directly; on subsequent calls the blocks are ORed
+  /// element-by-element.  Two filters can be merged only when they have the
+  /// same number of blocks.
+  void mergeFilter(char* group, const StringView& incomingBytes) {
+    constexpr size_t kBlockSize = sizeof(SplitBlockBloomFilter::Block);
+    VELOX_CHECK_EQ(
+        incomingBytes.size() % kBlockSize,
+        0,
+        "Intermediate bloom filter size {} is not a multiple of block size {}",
+        incomingBytes.size(),
+        kBlockSize);
+    const int32_t incomingNumBlocks =
+        static_cast<int32_t>(incomingBytes.size() / kBlockSize);
+
+    auto* acc = value<BloomFilterAccumulator>(group);
+    if (FOLLY_UNLIKELY(!acc->isInitialized())) {
+      acc->init(incomingNumBlocks);
+      std::memcpy(acc->blocks, incomingBytes.data(), incomingBytes.size());
+    } else {
+      VELOX_CHECK_EQ(
+          acc->numBlocks,
+          incomingNumBlocks,
+          "Cannot merge bloom filters of different sizes: {} vs {}",
+          acc->numBlocks,
+          incomingNumBlocks);
+      // OR the filter bytes. The destination is aligned (via aligned_alloc);
+      // cast to uint8_t* to avoid any aliasing or alignment concerns on the
+      // source, which may come from an unaligned string buffer.
+      const auto* src =
+          reinterpret_cast<const uint8_t*>(incomingBytes.data());
+      auto* dst = reinterpret_cast<uint8_t*>(acc->blocks);
+      const size_t numBytes = incomingBytes.size();
+      for (size_t i = 0; i < numBytes; ++i) {
+        dst[i] |= src[i];
+      }
+    }
+    clearNull(group);
+  }
+
   /// Number of SplitBlockBloomFilter::Block elements in each group's filter.
   const int32_t numBlocks_;
-  /// Reused across calls to addRawInput / addSingleGroupRawInput.
+  /// Reused across calls to addRawInput / addSingleGroupRawInput /
+  /// addIntermediateResults / addSingleGroupIntermediateResults.
   DecodedVector decodedInput_;
 };
 
@@ -302,6 +362,12 @@ void registerBloomFilterAggregateFunction(
           -> std::unique_ptr<exec::Aggregate> {
         VELOX_CHECK_EQ(
             argTypes.size(), 1, "{} takes one argument", names.front());
+        // For the partial/single step argTypes[0] is the raw input type T; for
+        // the final/intermediate step argTypes[0] is varbinary (the
+        // intermediate type).  VELOX_DYNAMIC_SCALAR_TYPE_DISPATCH resolves T
+        // correctly in both cases: for varbinary it yields StringView, and the
+        // merge methods (addIntermediateResults, addSingleGroupIntermediateResults)
+        // do not use T at all.
         return VELOX_DYNAMIC_SCALAR_TYPE_DISPATCH(
             createBloomFilterAggregate, argTypes[0]->kind(), numBlocks);
       },
